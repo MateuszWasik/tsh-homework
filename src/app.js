@@ -1,6 +1,7 @@
 import './assets/scss/app.scss';
 import $ from 'cash-dom';
-import fetch from 'isomorphic-fetch';
+import {fetchUserDetails, fetchUserRealHistory} from "./services/user-real-history-service";
+import {realHistoryTemplatePullRequest, realHistoryTemplateComment} from "./templates/user-real-history";
 require('es6-promise').polyfill();
 
 const regexExpression = '^[!a-zA-Z0-9_-]+$';
@@ -10,24 +11,40 @@ export class App {
   initializeApp() {
     let self = this;
     self.regex = new RegExp(regexExpression);
-    self.usernameInputElement =  document.getElementById('username-input');
+    self.usernameInputElement = document.getElementById('username-input');
     self.isValidationCorrect = false;
 
-    $('.load-username').on('click', function (e) {
+    $('.load-username').on('click', function () {
       let userName = $('.username.input').val();
 
       self.validationChecker(userName);
 
       if (self.isValidationCorrect) {
-        fetch('https://api.github.com/users/' + userName)
-          .then(response => response.json())
+        self.clearTemplateContainer();
+
+        fetchUserDetails(userName)
           .then((body) => {
             self.profile = body;
             self.update_profile();
+
+            fetchUserRealHistory(userName)
+              .then(body =>
+                body.filter(body => body.type === 'PullRequestEvent' || body.type === "PullRequestReviewCommentEvent"))
+              .then(eventArray => {
+                eventArray.map(singleEvent => {
+                  self.generateProperTemplate(singleEvent)
+                })
+              })
+              .catch(error => {
+                console.error(error)
+              })
+          })
+          .catch(error => {
+            console.error(error)
           })
       }
-    });
-  }
+    })
+  };
 
   update_profile() {
     $('#profile-name').text($('.username.input').val());
@@ -37,9 +54,9 @@ export class App {
   }
 
   validationChecker(value) {
-      value.match(this.regex)
-        ? this.validationChanger(true)
-        : this.validationChanger(false);
+    value.match(this.regex)
+      ? this.validationChanger(true)
+      : this.validationChanger(false);
   }
 
   validationChanger(correctValidation) {
@@ -50,5 +67,21 @@ export class App {
       this.usernameInputElement.classList.add("validation-error");
       this.isValidationCorrect = false;
     }
+  }
+
+  generateProperTemplate(singleEvent) {
+    const selectorTemplateContainer = $('#template-container');
+
+    switch (singleEvent.type) {
+      case 'PullRequestEvent':
+        selectorTemplateContainer.append(realHistoryTemplatePullRequest(singleEvent));
+        break;
+      case 'PullRequestReviewCommentEvent':
+        selectorTemplateContainer.append(realHistoryTemplateComment(singleEvent));
+    }
+  }
+
+  clearTemplateContainer() {
+    $('#template-container').empty();
   }
 }
