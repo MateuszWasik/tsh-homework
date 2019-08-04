@@ -5,14 +5,21 @@ import {realHistoryTemplatePullRequest, realHistoryTemplateComment} from "./temp
 require('es6-promise').polyfill();
 
 const regexExpression = '^[!a-zA-Z0-9_-]+$';
+const usernameInputElement = document.getElementById('username-input');
+const spinnerElement = document.getElementById('spinner');
+const profileContainerElement = document.getElementById('profile-container');
+const fakeHistoryElement = document.getElementById('fakeHistory');
+const realHistoryElement = document.getElementById('realHistory');
+const selectorTemplateContainer = $('#template-container');
 
 export class App {
 
   initializeApp() {
     let self = this;
     self.regex = new RegExp(regexExpression);
-    self.usernameInputElement = document.getElementById('username-input');
     self.isValidationCorrect = false;
+
+    self.hideRealHistoryContainer();
 
     $('.load-username').on('click', function () {
       let userName = $('.username.input').val();
@@ -20,12 +27,13 @@ export class App {
       self.validationChecker(userName);
 
       if (self.isValidationCorrect) {
-        self.clearTemplateContainer();
+        self.hideOrShowProfileAndHistoryContainers(true);
+        self.clearRealHistoryTemplateContainer();
 
         fetchUserDetails(userName)
           .then((body) => {
             self.profile = body;
-            self.update_profile();
+            self.updateProfile();
 
             fetchUserRealHistory(userName)
               .then(body =>
@@ -33,20 +41,25 @@ export class App {
               .then(eventArray => {
                 eventArray.map(singleEvent => {
                   self.generateProperTemplate(singleEvent)
-                })
+                });
               })
+              .then(() =>
+                self.hideOrShowProfileAndHistoryContainers(false))
               .catch(error => {
-                console.error(error)
+                console.error(error);
               })
           })
           .catch(error => {
-            console.error(error)
+            console.error(error);
           })
+          .finally(() =>
+            spinnerElement.classList.remove('is-hidden')
+          )
       }
     })
   };
 
-  update_profile() {
+  updateProfile() {
     $('#profile-name').text($('.username.input').val());
     $('#profile-image').attr('src', this.profile.avatar_url);
     $('#profile-url').attr('href', this.profile.html_url).text(this.profile.login);
@@ -61,17 +74,15 @@ export class App {
 
   validationChanger(correctValidation) {
     if (correctValidation) {
-      this.usernameInputElement.classList.remove("validation-error");
+      usernameInputElement.classList.remove("validation-error");
       this.isValidationCorrect = true;
     } else {
-      this.usernameInputElement.classList.add("validation-error");
+      usernameInputElement.classList.add("validation-error");
       this.isValidationCorrect = false;
     }
   }
 
   generateProperTemplate(singleEvent) {
-    const selectorTemplateContainer = $('#template-container');
-
     switch (singleEvent.type) {
       case 'PullRequestEvent':
         selectorTemplateContainer.append(realHistoryTemplatePullRequest(singleEvent));
@@ -81,7 +92,25 @@ export class App {
     }
   }
 
-  clearTemplateContainer() {
-    $('#template-container').empty();
+  clearRealHistoryTemplateContainer() {
+    selectorTemplateContainer.empty();
+  }
+
+  hideRealHistoryContainer() {
+    realHistoryElement.classList.add('is-hidden');
+  }
+
+  hideOrShowProfileAndHistoryContainers(hide) {
+    if (hide) {
+      spinnerElement.classList.remove('is-hidden');
+      profileContainerElement.classList.add('is-hidden');
+      fakeHistoryElement.classList.add('is-hidden');
+      realHistoryElement.classList.add('is-hidden');
+    } else {
+      spinnerElement.classList.add('is-hidden');
+      profileContainerElement.classList.remove('is-hidden');
+      realHistoryElement.classList.remove('is-hidden');
+
+    }
   }
 }
